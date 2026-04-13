@@ -101,7 +101,6 @@ def run_experiment(method_name):
         STP=10
 
     elif method_name == "KappaTune_LoRA":
-        # ← NOW USES PEFT SELECTOR
         stable_modules = get_stable_expert_names(model, budget_k=300)
         lora_config = LoraConfig(
             r=190,
