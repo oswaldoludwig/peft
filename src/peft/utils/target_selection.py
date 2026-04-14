@@ -44,21 +44,16 @@ class KappaTuneSelector:
 
             # Handle quantized weights (bnb 4-bit + int8)
             weight = module.weight
+
             if bnb is not None:
                 if hasattr(weight, "quant_state"):                    # 4-bit (NF4/FP4)
-                    try:
-                        w = bnb.functional.dequantize_4bit(
-                            weight.data, weight.quant_state
-                        ).float()
-                    except (RuntimeError, ValueError, AttributeError):
-                        w = weight.data.detach().float()
+                    w = bnb.functional.dequantize_4bit(
+                        weight.data, weight.quant_state
+                    ).float()
                 elif hasattr(weight, "state") and hasattr(weight.state, "CB"):  # int8
-                    try:
-                        w = bnb.functional.int8_vectorwise_dequant(
-                            weight.state.CB, weight.state.SCB
-                        ).float()
-                    except (RuntimeError, ValueError, AttributeError):
-                        w = weight.data.detach().float()
+                    w = bnb.functional.int8_vectorwise_dequant(
+                        weight.state.CB, weight.state.SCB
+                    ).float()
                 else:
                     w = weight.data.detach().float()
             else:
@@ -73,6 +68,7 @@ class KappaTuneSelector:
                 kappa = (S[0] / (S[-1] + 1e-8)).item()
                 condition_numbers[module_name] = kappa
             except (torch.linalg.LinAlgError, RuntimeError):
+                # SVD failed (numerical instability or CUDA edge case)
                 condition_numbers[module_name] = float("inf")
 
         self._condition_numbers = condition_numbers
