@@ -10,31 +10,13 @@ from transformers import (
 )
 from datasets import load_dataset
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, TaskType
-from peft.utils.target_selection import KappaTuneSelector   # ← NEW: PEFT selector
+from peft.utils.target_selection import KappaTuneSelector, find_kappa_target_modules
 import bitsandbytes as bnb
 import gc
 import math
 
 # ==========================================
-# 1. Target layer selection using KappaTuneSelector
-# ==========================================
-def get_stable_expert_names(model, budget_k=300):
-    print(f" [KappaTune] Identifying {budget_k} most stable expert modules using PEFT KappaTuneSelector...")
-    
-    selector = KappaTuneSelector(model)
-    
-    # Get top candidates (more than needed)
-    all_low_kappa = selector.get_best_targets(num_modules=budget_k * 2)
-    
-    # Keep ONLY expert modules (exact same filtering as the paper)
-    expert_modules = [name for name in all_low_kappa if "experts" in name]
-    
-    selected = expert_modules[:budget_k]
-    print(f" → Selected {len(selected)} expert modules with lowest κ")
-    return selected
-
-# ==========================================
-# 2. Data Preparation
+# 1. Data Preparation
 # ==========================================
 MODEL_ID = "deepseek-ai/DeepSeek-V2-Lite"
 tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
@@ -59,7 +41,7 @@ wiki_tokenized = wiki_ds.filter(lambda x: len(x["text"]) > 20).map(
 )
 
 # ==========================================
-# 3. Experiment Engine
+# 2. Experiment Engine
 # ==========================================
 def evaluate_perplexity(model, dataset, name="Dataset"):
     model.eval()
@@ -99,18 +81,23 @@ def run_experiment(method_name):
         model.print_trainable_parameters()
         LR=2e-4
         STP=10
-
+        
     elif method_name == "KappaTune_LoRA":
-        stable_modules = get_stable_expert_names(model, budget_k=300)
+        print(" [KappaTune] Selecting target modules using PEFT KappaTuneSelector...")
+
+        # Relative selection â€” works on any architecture
+        stable_modules = find_kappa_target_modules(model, top_p=0.2)
+
         lora_config = LoraConfig(
             r=190,
-            target_modules=stable_modules, 
-            task_type=TaskType.CAUSAL_LM, lora_dropout=0.05
+            target_modules=stable_modules,
+            task_type=TaskType.CAUSAL_LM,
+            lora_dropout=0.05,
         )
         model = get_peft_model(model, lora_config)
         model.print_trainable_parameters()
-        LR=2e-4
-        STP=35
+        LR = 2e-4
+        STP = 25
 
     if method_name != "Baseline":
         args = TrainingArguments(
@@ -133,7 +120,7 @@ def run_experiment(method_name):
     return t_ppl_test, t_ppl_train, f_ppl
 
 # ==========================================
-# 4. Results (same table as paper)
+# 3. Results (same table as paper)
 # ==========================================
 results = {}
 results["Baseline"]     = run_experiment("Baseline")
