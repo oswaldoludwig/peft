@@ -1,6 +1,6 @@
 # KappaTune Experiment
 
-This script compares different fine-tuning strategies on a downstream task (IMDB sentiment) while measuring **catastrophic forgetting** on a general-knowledge control dataset (WikiText).
+This script compares different fine-tuning strategies on a downstream task (IMDB sentiment) while measuring **catastrophic forgetting** on a general-knowledge control dataset (WikiText). For further details see the [KappaTune paper](https://arxiv.org/abs/2506.16289).
 
 - **Baseline**: No adaptation (full 4-bit model)
 - **LoRA_Global**: Classic LoRA on common projections (`q_proj`, `v_proj`, `up_proj`, `down_proj`)
