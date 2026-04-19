@@ -46,7 +46,7 @@ class KappaTuneSelector:
             weight = module.weight
 
             if bnb is not None:
-                if hasattr(weight, "quant_state"):                    # 4-bit (NF4/FP4)
+                if hasattr(weight, "quant_state"):                    # 4-bit
                     w = bnb.functional.dequantize_4bit(
                         weight.data, weight.quant_state
                     ).float()
@@ -63,13 +63,10 @@ class KappaTuneSelector:
             if any(dim > self.max_dim_size_to_analyze for dim in w.shape):
                 continue
 
-            try:
-                S = torch.linalg.svdvals(w.view(w.size(0), -1))
-                kappa = (S[0] / (S[-1] + 1e-8)).item()
-                condition_numbers[module_name] = kappa
-            except (torch.linalg.LinAlgError, RuntimeError):
-                # SVD failed (numerical instability or CUDA edge case)
-                condition_numbers[module_name] = float("inf")
+            # Compute condition number κ
+            S = torch.linalg.svdvals(w.view(w.size(0), -1))
+            kappa = (S[0] / (S[-1] + 1e-8)).item()
+            condition_numbers[module_name] = kappa
 
         self._condition_numbers = condition_numbers
 
