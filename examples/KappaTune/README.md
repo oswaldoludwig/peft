@@ -6,12 +6,17 @@ This script compares different fine-tuning strategies on a downstream task (IMDB
 - **LoRA_Global**: Classic LoRA on common projections (`q_proj`, `v_proj`, `up_proj`, `down_proj`)
 - **KappaTune_LoRA**: The new `KappaTuneSelector` with relative selection (`top_p=0.2`)
 
-The goal is to show that KappaTune achieves similar task adaptation **while forgetting less** of the original pre-trained knowledge.
+The goal is to show that KappaTune achieves similar task adaptation **while forgetting less** of the original pre-trained knowledge. 
+
+In case of using this test framework for different experiments, it's worth highlighting that size matters.
+KappaTune shows the strongest gains on larger models (≥7B) and especially on MoE architectures (many independent expert modules). In small, dense models, the benefit is reduced because there is a limited variety of independent tensors to choose from. A fair comparison of catastrophic forgetting should make both methods reach roughly the same level of adaptation to the new task (similar training PPL). Matching on test PPL is not sufficient, because the same test PPL can be achieved through overfitting (more forgetting) or underfitting (less forgetting).
 
 ### How to run
 
 cd examples/KappaTune
+
 Recommended: run in a clean environment with a GPU
+
 python experiments_SA_kappatune_peft.py
 
 ### Key hyperparameters to play with
