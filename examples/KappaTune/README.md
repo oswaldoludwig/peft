@@ -17,7 +17,7 @@ cd examples/KappaTune
 
 Recommended: run in a clean environment with a GPU
 
-python experiments_SA_kappatune_peft.py
+`python experiments_SA_kappatune_peft.py`
 
 ### Key hyperparameters to play with
 
