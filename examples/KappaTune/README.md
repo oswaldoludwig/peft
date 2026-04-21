@@ -13,7 +13,7 @@ KappaTune shows the strongest gains on larger models (≥7B) and especially on M
 
 ### How to run
 
-cd examples/KappaTune
+`cd examples/KappaTune`
 
 Recommended: run in a clean environment with a GPU
 
