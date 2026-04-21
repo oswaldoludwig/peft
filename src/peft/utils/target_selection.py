@@ -111,7 +111,7 @@ class KappaTuneSelector:
 
 def find_kappa_target_modules(
     model: nn.Module, top_p: float = 0.2, max_dim_size_to_analyze: int = 16384
-) -> List[str]:
+) -> list[str]:
 
     """
     One-liner convenience function (recommended for most users).
