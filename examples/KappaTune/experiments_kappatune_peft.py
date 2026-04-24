@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 from transformers import (
-    AutoModelForCausalLM, 
-    AutoTokenizer, 
-    TrainingArguments, 
-    Trainer, 
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    TrainingArguments,
+    Trainer,
     BitsAndBytesConfig,
     DataCollatorForLanguageModeling
 )
@@ -15,23 +15,22 @@ import bitsandbytes as bnb
 import gc
 import math
 
+
 # ==========================================
 # 1. Data Preparation
 # ==========================================
-MODEL_ID = "deepseek-ai/DeepSeek-V2-Lite"
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
+MODEL_ID = "mistralai/Mixtral-8x7B-Instruct-v0.1"
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
 tokenizer.pad_token = tokenizer.eos_token
 
-def format_imdb(example):
-    val = example.get('label', example.get('sentiment', 0))
-    label_text = "Positive" if val == 1 else "Negative"
-    return {"text": f"Review: {example['text'][:512]}\n\nSentiment: {label_text}"}
+def format_gsm8k(example):
+    return {"text": f"Question: {example['question']}\nAnswer: {example['answer']}"}
 
 print("Loading and preprocessing datasets...")
-imdb_ds = load_dataset("imdb", split="train[:1000]").train_test_split(test_size=0.1)
-imdb_tokenized = imdb_ds.map(format_imdb).map(
-    lambda x: tokenizer(x["text"], padding="max_length", truncation=True, max_length=256), 
-    batched=True, remove_columns=imdb_ds["train"].column_names
+gsm8k_ds = load_dataset("gsm8k", "main", split="train[:1000]").train_test_split(test_size=0.1)
+gsm8k_tokenized = gsm8k_ds.map(format_gsm8k).map(
+    lambda x: tokenizer(x["text"], padding="max_length", truncation=True, max_length=256),
+    batched=True, remove_columns=["question", "answer", "text"]
 )
 
 wiki_ds = load_dataset("wikitext", "wikitext-2-raw-v1", split="test[:400]")
@@ -54,17 +53,17 @@ def evaluate_perplexity(model, dataset, name="Dataset"):
             batch = {k: v.to(model.device) for k, v in batch.items()}
             outputs = model(**batch, use_cache=False)
             total_loss += outputs.loss.item()
-            if i >= 40: break 
+            if i >= 40: break
     return math.exp(total_loss / (i + 1))
 
 def run_experiment(method_name):
     print(f"\n{'='*40}\n>>> EXPERIMENT: {method_name}\n{'='*40}")
-    
+
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True, bnb_4bit_quant_type="nf4", 
         bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_use_double_quant=True,
     )
-    
+
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_ID, quantization_config=bnb_config, trust_remote_code=True, device_map="auto"
     )
@@ -72,32 +71,48 @@ def run_experiment(method_name):
 
     # Configure PEFT based on method
     if method_name == "LoRA_Global":
+        Target_modules = [
+        "q_proj", 
+        "k_proj", 
+        "v_proj", 
+        "o_proj", 
+        "gate_proj", 
+        "up_proj", 
+        "down_proj"
+        ]
         lora_config = LoraConfig(
-            r=16,
-            target_modules=["q_proj", "v_proj", "up_proj", "down_proj"], 
+            r=256, 
+            target_modules=Target_modules, 
             task_type=TaskType.CAUSAL_LM, lora_dropout=0.05
         )
         model = get_peft_model(model, lora_config)
         model.print_trainable_parameters()
         LR=2e-4
-        STP=10
-        
+        STP=40
+
     elif method_name == "KappaTune_LoRA":
         print(" [KappaTune] Selecting target modules using PEFT KappaTuneSelector...")
 
         # Relative selection â€” works on any architecture
-        stable_modules = find_kappa_target_modules(model, top_p=0.2)
+        stable_modules_dic = find_kappa_target_modules(model, top_p=0.2)
 
         lora_config = LoraConfig(
-            r=190,
-            target_modules=stable_modules,
+            r=85,
+            target_modules = stable_modules_dic["target_modules"], 
+            target_parameters = stable_modules_dic["target_parameters"] if stable_modules_dic["target_parameters"] else None, 
             task_type=TaskType.CAUSAL_LM,
             lora_dropout=0.05,
         )
+
         model = get_peft_model(model, lora_config)
         model.print_trainable_parameters()
+        trainable = [(n, p.shape, p.numel()) for n, p in model.named_parameters() if p.requires_grad]
+
+        print(f"#trainable tensors: {len(trainable)}")
+        print(f"#trainable params: {sum(x[2] for x in trainable):,}")
+
         LR = 2e-4
-        STP = 25
+        STP = 40   # or whatever step count you prefer for fair comparison
 
     if method_name != "Baseline":
         args = TrainingArguments(
@@ -106,29 +121,31 @@ def run_experiment(method_name):
             bf16=True, logging_steps=5, save_strategy="no", report_to="none"
         )
         trainer = Trainer(
-            model=model, args=args, train_dataset=imdb_tokenized["train"],
+            model=model, args=args, train_dataset=gsm8k_tokenized["train"],
             data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False)
         )
         trainer.train()
-    
-    t_ppl_test = evaluate_perplexity(model, imdb_tokenized["test"], "IMDB")
-    t_ppl_train = evaluate_perplexity(model, imdb_tokenized["train"], "IMDB")
+
+    t_ppl_test = evaluate_perplexity(model, gsm8k_tokenized["test"], "gsm8k")
+    t_ppl_train = evaluate_perplexity(model, gsm8k_tokenized["train"], "gsm8k")
     f_ppl = evaluate_perplexity(model, wiki_tokenized, "WikiText")
-    
+
     del model
     gc.collect()
+    torch.cuda.empty_cache()
     return t_ppl_test, t_ppl_train, f_ppl
 
 # ==========================================
 # 3. Results (same table as paper)
 # ==========================================
 results = {}
+
+results["KappaTune"]    = run_experiment("KappaTune_LoRA")
 results["Baseline"]     = run_experiment("Baseline")
 results["LoRA_Global"]  = run_experiment("LoRA_Global")
-results["KappaTune"]    = run_experiment("KappaTune_LoRA")
 
 print("\n" + "="*70)
-print(f"{'METHOD':<15} | {'IMDB PPL (Task train)':<18} |  {'IMDB PPL (Task test)':<18} | {'Wiki PPL (General/control)':<18}")
+print(f"{'METHOD':<15} | {'gsm8k PPL (Task train)':<18} |  {'gsm8k PPL (Task test)':<18} | {'Wiki PPL (General/control)':<18}")
 print("-" * 70)
 for m, (tpte,tptr,fp) in results.items():
     print(f"{m:<15} | {tptr:<18.4f} | {tpte:<18.4f} | {fp:<18.4f}")
