@@ -6,7 +6,9 @@ This script compares different fine-tuning strategies on a downstream task (gsm8
 - **LoRA_Global**: Classic LoRA on common projections (`q_proj`, `k_proj`, `o_proj`, `v_proj`, `gate_proj`, `up_proj`, `down_proj` )
 - **KappaTune_LoRA**: The new `KappaTuneSelector` with relative selection (`top_p=0.2`)
 
-The goal is to show that KappaTune achieves similar task adaptation **while forgetting less** of the original pre-trained knowledge. 
+The goal is to show that KappaTune achieves similar task adaptation **while forgetting less** of the original pre-trained knowledge.
+
+KappaTune is indicated when catastrophic forgetting is a concern. If your fine-tuning data is closely aligned with the model's pretraining distribution, it can even decrease general/Wiki perplexity. This is the case of fine-tuning on math data like GSM8K (adopted in this experiment) for some models. Then unrestricted LoRA over all layers may yield better results, since it reinforces pre-training.
 
 In case of using this test framework for different experiments, it's worth highlighting that size matters.
 KappaTune shows the strongest gains on larger models (≥7B) and especially on MoE architectures (many independent expert modules). In small, dense models, the benefit is reduced because there is a limited variety of independent tensors to choose from. A fair comparison of catastrophic forgetting should make both methods reach roughly the same level of adaptation to the new task (similar training PPL). Matching on test PPL is not sufficient, because the same test PPL can be achieved through overfitting (more forgetting) or underfitting (less forgetting).
