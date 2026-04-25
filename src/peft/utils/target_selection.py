@@ -118,7 +118,7 @@ class KappaTuneSelector:
         top_p: Optional[float] = None,
         num_modules: Optional[int] = None,
         threshold: Optional[float] = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Return the best MoE parameter targets according to one of three mutually-exclusive strategies.
 
