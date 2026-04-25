@@ -3,7 +3,7 @@
 **Automatic LoRA target module selection based on matrix condition numbers (κ)**
 
 `KappaTuneSelector` implements the condition-number-based target selection strategy from the [KappaTune paper](https://arxiv.org/abs/2506.16289).  
-It scans every `nn.Linear` module, computes its matrix condition number **κ = σ_max / σ_min**, and selects the most isotropic layers (lowest κ). These layers are the most flexible for LoRA adaptation and help mitigate catastrophic forgetting on downstream datasets.
+It scans every nn.Linear module and, for models where MoE expert weights are stored as fused 3D nn.Parameter tensors (e.g. Llama-4, Qwen3-MoE), also those parameters, computes the matrix condition number κ = σ_max / σ_min for each, and selects the most isotropic layers (lowest κ). These layers are the most flexible for LoRA adaptation and help mitigate catastrophic forgetting on downstream datasets.
 
 The selector fully supports **4-bit and int8 quantized models** (bitsandbytes).
 
