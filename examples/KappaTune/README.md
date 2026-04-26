@@ -10,9 +10,6 @@ The goal is to show that KappaTune achieves similar task adaptation **while forg
 
 KappaTune is indicated when catastrophic forgetting is a concern. If your fine-tuning data is closely aligned with the model's pretraining distribution, it can even decrease general/Wiki perplexity. This is the case of fine-tuning on math data like GSM8K (adopted in this experiment) for some models. Then unrestricted LoRA over all layers may yield better results, since it reinforces pre-training.
 
-In case of using this test framework for different experiments, it's worth highlighting that size matters.
-KappaTune shows the strongest gains on larger models (≥7B) and especially on MoE architectures (many independent expert modules). In small, dense models, the benefit is reduced because there is a limited variety of independent tensors to choose from. A fair comparison of catastrophic forgetting should make both methods reach roughly the same level of adaptation to the new task (similar training PPL). Matching on test PPL is not sufficient, because the same test PPL can be achieved through overfitting (more forgetting) or underfitting (less forgetting).
-
 ### Key hyperparameters to play with
 
 | Hyperparameter                | Location                          | Default          | What it controls                                      | Recommendation                                      |
@@ -28,8 +25,6 @@ KappaTune shows the strongest gains on larger models (≥7B) and especially on M
 ## Expected results
 
 Running the script with default parameters produces the following behavior.
-
-### KappaTune vs LoRA (logs)
 
 <details>
 <summary><strong>KappaTune (training log)</strong></summary>
@@ -157,3 +152,64 @@ KappaTune       | 1.4410             | 3.2826             | 13.7780
 Baseline        | 3.6899             | 3.4668             | 13.9841           
 LoRA_Global     | 1.6593             | 3.5648             | 26.6836           
 ======================================================================
+
+
+```
+
+</details>
+
+## Dense model with varying training effort
+
+Since we are using small datasets, the adaptation effort is small, as is the risk of forgetting. To evaluate catastrophic forgetting during intensive fine-tuning we need big datasets or overfitting a small dataset. Therefore, I ran a set of experiments that track the performance of a dense LLM (Llama 8B) trained on the IMDB dataset over extended epochs, proxying the heavy gradient updates typical of massive datasets. The experiments use the same Python script, changing just these parameters:
+
+```python
+MODEL_ID = "unsloth/Meta-Llama-3.1-8B-Instruct"
+imdb_ds = load_dataset("imdb", split="train[:1000]").train_test_split(test_size=0.1)
+imdb_tokenized = imdb_ds.map(format_imdb).map(
+    lambda x: tokenizer(x["text"], padding="max_length", truncation=True, max_length=256), 
+    batched=True, remove_columns=imdb_ds["train"].column_names
+)
+    if method_name == "LoRA_Global":
+        Target_modules = [
+        "q_proj", 
+        "k_proj", 
+        "v_proj", 
+        "o_proj", 
+        "gate_proj", 
+        "up_proj", 
+        "down_proj"
+        ]
+        lora_config = LoraConfig(
+            r=12, 
+            target_modules=Target_modules, 
+            task_type=TaskType.CAUSAL_LM, lora_dropout=0.05
+        )
+        model = get_peft_model(model, lora_config)
+        model.print_trainable_parameters()
+        LR=2e-4
+        STP= #VAR <from 4 to 20>
+    elif method_name == "KappaTune_LoRA":
+        stable_modules_dic = find_kappa_target_modules(model, top_p=0.2)
+        lora_config = LoraConfig(
+            r=64,
+            target_modules = stable_modules_dic["target_modules"], 
+            target_parameters = stable_modules_dic["target_parameters"] if stable_modules_dic["target_parameters"] else None, 
+            task_type=TaskType.CAUSAL_LM,
+            lora_dropout=0.05,
+        )
+        model = get_peft_model(model, lora_config)
+        model.print_trainable_parameters()
+        trainable = [(n, p.shape, p.numel()) for n, p in model.named_parameters() if p.requires_grad]
+        LR = 2e-4
+        STP = # VAR <from 6 to 60>
+
+```
+
+The figure below plots task-specific adaptation (IMDB perplexity) against general knowledge retention (control Wiki perplexity). The results reveal a distinct divergence: while both methods perform comparably under light training loads, pushing into deeper convergence exposes KappaTune's structural advantage. As the model tightly fits the target data, standard LoRA exhibits a steep degradation in general knowledge (higher Wiki PPL), whereas KappaTune maintains a significantly flatter trajectory. This demonstrates its superior ability to isolate new learning and mitigate catastrophic forgetting even under sustained training pressure.
+
+
+<img width="778" height="536" alt="image" src="https://github.com/user-attachments/assets/4cbbcaa2-e433-48cf-8764-67498462f686" />
+
+
+In case of using this test framework for different experiments, it's worth highlighting that size matters.
+KappaTune shows the strongest gains on larger models (≥7B) and especially on MoE architectures (many independent expert modules). In small, dense models, the benefit is reduced because there is a limited variety of independent tensors to choose from. A fair comparison of catastrophic forgetting should make both methods reach roughly the same level of adaptation to the new task (similar training PPL). Matching on test PPL is not sufficient, because the same test PPL can be achieved through overfitting (more forgetting) or underfitting (less forgetting).
