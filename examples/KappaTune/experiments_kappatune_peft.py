@@ -10,7 +10,7 @@ from transformers import (
 )
 from datasets import load_dataset
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, TaskType
-from peft.utils.target_selection import KappaTuneSelector, find_kappa_target_modules
+from peft.helpers import find_kappa_target_modules
 import bitsandbytes as bnb
 import gc
 import math
