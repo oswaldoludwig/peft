@@ -174,7 +174,7 @@ Use `find_kappa_target_modules` as a one-liner to get the optimal `target_module
 
 ```python
 from peft import LoraConfig, get_peft_model
-from peft.utils.target_selection import find_kappa_target_modules
+from peft.helpers import find_kappa_target_modules
 
 model = AutoModelForCausalLM.from_pretrained("mistralai/Mixtral-8x7B-Instruct-v0.1")
 
