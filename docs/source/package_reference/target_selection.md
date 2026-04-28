@@ -10,15 +10,15 @@ The selector fully supports **4-bit and int8 quantized models** (bitsandbytes).
 ## Quick one-liner (recommended)
 
 ```python
-from peft.utils.target_selection import find_kappa_target_modules
+from peft.helpers import find_kappa_target_modules
 
 target_modules = find_kappa_target_modules(model, top_p=0.2)
 ```
 
 ## API reference
 
-::: peft.utils.target_selection.KappaTuneSelector
+::: peft.helpers.KappaTuneSelector
     options:
       heading_level: 3
 
-::: peft.utils.target_selection.find_kappa_target_modules
+::: peft.helpers.find_kappa_target_modules
