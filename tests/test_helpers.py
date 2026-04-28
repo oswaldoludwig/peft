@@ -611,7 +611,7 @@ class TestKappaTuneSelector:
         assert "target_modules" in result
         assert "target_parameters" in result
         assert isinstance(result["target_modules"], list)
-        assert isinstance(result["target_parameters"], list)
+        assert result["target_parameters"] is None
 
     def test_find_kappa_target_modules_selects_modules(self, small_model):
         """Basic functionality test on regular nn.Linear layers."""
@@ -634,7 +634,6 @@ class TestKappaTuneSelector:
         class DummyMoE(nn.Module):
             def __init__(self):
                 super().__init__()
-                # Example fused gate_up_proj shape: (num_experts, hidden * 2, intermediate)
                 self.gate_up_proj = nn.Parameter(torch.randn(8, 4096, 11008))
                 self.down_proj = nn.Parameter(torch.randn(8, 11008, 4096))
 
@@ -653,4 +652,6 @@ class TestKappaTuneSelector:
 
         # Test convenience function
         result = find_kappa_target_modules(model, top_p=0.5)
+        assert isinstance(result["target_parameters"], list)
         assert len(result["target_parameters"]) > 0
+        assert any("gate_up_proj" in name or "down_proj" in name for name in result["target_parameters"])
