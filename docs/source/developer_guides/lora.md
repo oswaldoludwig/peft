@@ -189,7 +189,7 @@ config = LoraConfig(
 peft_model = get_peft_model(model, config)
 ```
 
-See a complete example [here](../../../examples/KappaTune/experiments_kappatune_peft.py).
+See a complete example [here](https://github.com/huggingface/peft/blob/main/examples/KappaTune/experiments_kappatune_peft.py).
 
 ## Variants
 
