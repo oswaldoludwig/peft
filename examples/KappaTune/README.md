@@ -8,7 +8,7 @@ This script compares different fine-tuning strategies on a downstream task (gsm8
 
 The goal is to show that KappaTune achieves similar task adaptation **while forgetting less** of the original pre-trained knowledge.
 
-KappaTune is indicated when catastrophic forgetting is a concern. If your fine-tuning data is closely aligned with the model's pretraining distribution, it can even decrease general/Wiki perplexity. This is the case of fine-tuning on math data like GSM8K (adopted in this experiment) for some models. Then unrestricted LoRA over all layers may yield better results, since it reinforces pre-training.
+KappaTune is recommended when catastrophic forgetting is a concern. If your fine-tuning data is closely aligned with the model's pretraining distribution, it can even decrease general/Wiki perplexity. This is the case of fine-tuning on math data like GSM8K (adopted in this experiment) for some models. Then unrestricted LoRA over all layers may yield better results, since it reinforces pre-training.
 
 ### Key hyperparameters to play with
 
