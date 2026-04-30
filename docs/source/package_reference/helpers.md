@@ -25,3 +25,14 @@ A collection of helper functions for PEFT.
 
 [[autodoc]] helpers.DoraCaching
     - all
+
+## KappaTune target selection
+
+`KappaTuneSelector` and `find_kappa_target_modules` implement condition-number-based target selection from the [KappaTune paper](https://arxiv.org/abs/2506.16289). 
+This helps mitigate catastrophic forgetting by preferring well-conditioned (isotropic) weight matrices for LoRA adaptation.
+
+[[autodoc]] helpers.KappaTuneSelector
+    - all
+
+[[autodoc]] helpers.find_kappa_target_modules
+    - all
